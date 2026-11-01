@@ -93,7 +93,8 @@ lint:
 # 2. Run simulation (Icarus Verilog)
 sim: $(VCD_FILE)
 
-$(VCD_FILE): $(SRCS) $(TB_SRCS) | $(BUILD_DIR)
+$(VCD_FILE): $(SRCS) $(TB_SRCS)
+	mkdir -p $(BUILD_DIR)
 	$(IVERILOG) -o $(SIM_OUT) -s $(TB_MODULE) $(SRCS) $(TB_SRCS)
 	$(VVP) $(SIM_OUT)
 
@@ -104,10 +105,8 @@ wave: sim
 # 4. Full physical FPGA build (Yosys -> nextpnr-himbaechel -> gowin_pack)
 build: $(BITSTREAM)
 
-$(BUILD_DIR):
+$(SYNTH_JSON): $(SRCS)
 	mkdir -p $(BUILD_DIR)
-
-$(SYNTH_JSON): $(SRCS) | $(BUILD_DIR)
 	$(YOSYS) -p "read_verilog $(SRCS); synth_gowin -top $(TOP_MODULE) -json $(SYNTH_JSON)"
 
 $(PNR_JSON): $(SYNTH_JSON) $(CST)
@@ -148,5 +147,6 @@ $(SWEEP_BIN): $(SRCS) sim_sweep.cpp
 	      -o $(SWEEP_BIN)
 
 # Run Yosys synthesis only and print detailed resource utilization statistics
-stat: $(SRCS) | $(BUILD_DIR)
+stat: $(SRCS)
+	mkdir -p $(BUILD_DIR)
 	$(YOSYS) -p "read_verilog $(SRCS); synth_gowin -top $(TOP_MODULE) -json $(SYNTH_JSON); stat"
