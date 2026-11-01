@@ -16,13 +16,9 @@ module nco #(
     reg signed [OUT_WIDTH-1:0] lut_sin [0:1023];
     reg signed [OUT_WIDTH-1:0] lut_cos [0:1023];
 
-    integer i;
     initial begin
-        for (i = 0; i < 1024; i = i + 1) begin
-            // 2 * PI * i / 1024 számítása 12 bites skálán (max 2047)
-            lut_sin[i] = $rtoi(2047.0 * $sin(2.0 * 3.1415926535 * i / 1024.0));
-            lut_cos[i] = $rtoi(2047.0 * $cos(2.0 * 3.1415926535 * i / 1024.0));
-        end
+        $readmemh("sin_lut.hex", lut_sin);
+        $readmemh("cos_lut.hex", lut_cos);
     end
 
     // Fázisakkumulátor

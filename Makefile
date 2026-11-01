@@ -2,10 +2,9 @@
 # Projekt konfiguráció (Tang Nano 9K)
 # ==============================================================================
 PROJ      = sasdr
-TOP_MODULE = top
-TB_MODULE  = test
-
-SRCS      = ddc_top.v
+TOP_MODULE = top_tangnano9k
+TB_MODULE  = 
+SRCS       = top_tangnano9k.v ddc_top.v nco.v cic_decimator.v cfir.v i2s_tx.v uart_rx.v uart_tx.v ddc_cat_kenwood.v
 TB_SRCS   = 
 CST       = tangnano9k.cst
 
@@ -83,9 +82,16 @@ v-wave: run-v-sim
 
 all: build
 
+VFLAGS = -Wall \
+         -Wno-DECLFILENAME \
+         -Wno-PROCASSINIT \
+         -Wno-WIDTH \
+         -Wno-UNUSEDSIGNAL \
+         -Wno-PINCONNECTEMPTY
+
 # 1. Gyors szintaktikai és logikai ellenőrzés (Verilator Linter)
 lint:
-	$(VERILATOR) --lint-only -Wall -Wno-DECLFILENAME -Wno-PROCASSINIT $(SRCS) --top-module $(TOP_MODULE)
+	$(VERILATOR) --lint-only $(VFLAGS) $(SRCS) --top-module $(TOP_MODULE)
 
 # 2. Szimuláció futtatása (Icarus Verilog)
 sim: $(VCD_FILE)
@@ -112,6 +118,7 @@ $(PNR_JSON): $(SYNTH_JSON) $(CST)
 	           --write $(PNR_JSON) \
 	           --device $(DEVICE) \
 	           --vopt family=$(FAMILY) \
+			   --freq 61.44 \
 	           --vopt cst=$(CST)
 
 $(BITSTREAM): $(PNR_JSON)
@@ -144,3 +151,8 @@ $(SWEEP_BIN): $(SRCS) sim_sweep.cpp
 	             -cc $(SRCS) --top-module ddc_top
 	$(CXX) $(CXXFLAGS) sim_sweep.cpp $(wildcard $(VERILATOR_DIR)/Vddc_top*.cpp) $(VLT_SRCS) \
 	      -o $(SWEEP_BIN)
+
+
+# Csak a Yosys szintézis és a részletes erőforrás-táblázat kiírása
+stat: $(SRCS) | $(BUILD_DIR)
+	$(YOSYS) -p "read_verilog $(SRCS); synth_gowin -top $(TOP_MODULE) -json $(SYNTH_JSON); stat"
