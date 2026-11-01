@@ -51,6 +51,10 @@ module ddc_top #(
     wire signed [MIX_WIDTH-1:0] mix_i = prod_i[22 : 23-MIX_WIDTH];
     wire signed [MIX_WIDTH-1:0] mix_q = prod_q[22 : 23-MIX_WIDTH];
 
+
+    wire signed [OUT_WIDTH-1:0] cic_i_data, cic_q_data;
+    wire cic_valid;
+
     // --- 3. CIC DECIMÁTOR: I (IN-PHASE) ÁG ---
     cic_decimator #(
         .IN_WIDTH(MIX_WIDTH),
@@ -60,8 +64,8 @@ module ddc_top #(
         .clk(clk),
         .rst_n(rst_n),
         .in_data(mix_i),
-        .out_data(i_data),
-        .out_valid(iq_valid) // Mindkét szűrő szinkronban lép, elég egy valid jel
+        .out_data(cic_i_data),
+        .out_valid(cic_valid) // Mindkét szűrő szinkronban lép, elég egy valid jel
     );
 
     // --- 4. CIC DECIMÁTOR: Q (QUADRATURE) ÁG ---
@@ -73,11 +77,11 @@ module ddc_top #(
         .clk(clk),
         .rst_n(rst_n),
         .in_data(mix_q),
-        .out_data(q_data),
+        .out_data(cic_q_data),
         .out_valid()         // Ezt a kimenetet nem kell bekötni
     );
 
-    // --- 3. CFIR DROOP-KOMPENZÁLÓ SZŰRŐK ---
+    // --- 5. CFIR DROOP-KOMPENZÁLÓ SZŰRŐK ---
     cfir #(OUT_WIDTH, 16, OUT_WIDTH) u_cfir_i (
         .clk(clk),
         .rst_n(rst_n),
