@@ -3,17 +3,17 @@ module cic_decimator #(
     parameter DECIM_R   = 640,
     parameter OUT_WIDTH = 24
 )(
-    input  wire                      clk,      // Gyors ADC órajel (pl. 61.44 MHz)
-    input  wire                      rst_n,    // Aszinkron vagy szinkron reset
-    input  wire signed [IN_WIDTH-1:0] in_data,  // Keverő kimenete (I vagy Q ág)
-    output reg  signed [OUT_WIDTH-1:0] out_data, // Decimált alapsávi minta
-    output reg                       out_valid // Impulzus, amikor új kimeneti adat áll rendelkezésre
+    input  wire                        clk,      // High-speed ADC clock (e.g., 61.44 MHz)
+    input  wire                        rst_n,    // Asynchronous or synchronous active-low reset
+    input  wire signed [IN_WIDTH-1:0]  in_data,  // Mixer output (I or Q channel)
+    output reg  signed [OUT_WIDTH-1:0] out_data, // Decimated baseband sample
+    output reg                         out_valid // 1-cycle pulse when new output sample is valid
 );
 
-    // Belső regiszterszélesség: 16 + ceil(4 * log2(640)) = 54 bit
+    // Internal register width: 16 + ceil(4 * log2(640)) = 54 bits
     localparam INT_WIDTH = 54;
 
-    // --- 1. INTEGRÁTOR FOKOZATOK (Gyors órajelen) ---
+    // --- 1. INTEGRATOR STAGES (Running at high-speed clock) ---
     reg signed [INT_WIDTH-1:0] itg0 = 0, itg1 = 0, itg2 = 0, itg3 = 0;
 
     always @(posedge clk or negedge rst_n) begin
@@ -27,7 +27,7 @@ module cic_decimator #(
         end
     end
 
-    // --- 2. MINTAVÉTELI OSZTÓ (Rate Changer: 1/640) ---
+    // --- 2. SAMPLE RATE DIVIDER (Rate Changer: 1/640) ---
     reg [9:0] count = 0;
     reg sample_en = 0;
 
@@ -46,7 +46,7 @@ module cic_decimator #(
         end
     end
 
-    // --- 3. FÉSŰS / DIFFERENCIÁLÓ FOKOZATOK (Lassú ütemben) ---
+    // --- 3. COMB / DIFFERENTIATOR STAGES (Running at decimated rate) ---
     reg signed [INT_WIDTH-1:0] d_itg3 = 0;
     reg signed [INT_WIDTH-1:0] diff0 = 0, d_diff0 = 0;
     reg signed [INT_WIDTH-1:0] diff1 = 0, d_diff1 = 0;
@@ -63,7 +63,7 @@ module cic_decimator #(
             out_valid <= 0;
             out_data  <= 0;
         end else if (sample_en) begin
-            // Fésűs kivonások: y[n] = x[n] - x[n-1]
+            // Comb subtractions: y[n] = x[n] - x[n-1]
             diff0   <= itg3 - d_itg3;
             d_itg3  <= itg3;
 
@@ -76,7 +76,7 @@ module cic_decimator #(
             diff3   <= diff2 - d_diff2;
             d_diff2 <= diff2;
 
-            // A legfelső OUT_WIDTH bit kivágása (MSB kerekítés/vágás)
+            // Slice top OUT_WIDTH bits (MSB truncation)
             out_data  <= diff3[INT_WIDTH-1 : INT_WIDTH-OUT_WIDTH];
             out_valid <= 1'b1;
         end else begin

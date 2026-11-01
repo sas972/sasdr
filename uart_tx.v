@@ -25,7 +25,7 @@ module uart_tx #(
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             state    <= S_IDLE;
-            uart_tx  <= 1'b1; // Alaphelyzetben magas
+            uart_tx  <= 1'b1; // Idle high
             tx_busy  <= 1'b0;
             clk_cnt  <= 0;
             bit_idx  <= 0;

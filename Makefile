@@ -1,20 +1,20 @@
 # ==============================================================================
-# Projekt konfiguráció (Tang Nano 9K)
+# Project Configuration (Tang Nano 9K)
 # ==============================================================================
-PROJ      = sasdr
+PROJ       = sasdr
 TOP_MODULE = top_tangnano9k
 TB_MODULE  = 
 SRCS       = top_tangnano9k.v ddc_top.v nco.v cic_decimator.v cfir.v i2s_tx.v uart_rx.v uart_tx.v ddc_cat_kenwood.v
-TB_SRCS   = 
-CST       = tangnano9k.cst
+TB_SRCS    = 
+CST        = tangnano9k.cst
 
-# Gowin / Tang Nano 9K hardver paraméterek
-DEVICE    = GW1NR-LV9QN88PC6/I5
-FAMILY    = GW1N-9C
-BOARD     = tangnano9k
+# Gowin / Tang Nano 9K Hardware Parameters
+DEVICE     = GW1NR-LV9QN88PC6/I5
+FAMILY     = GW1N-9C
+BOARD      = tangnano9k
 
 # ==============================================================================
-# Toolchain binárisok (Automatikus feloldás: PATH vagy a saját build mappád)
+# Toolchain Binaries (Auto-resolved from PATH or local venv)
 # ==============================================================================
 YOSYS          = yosys
 NEXTPNR        = nextpnr-himbaechel
@@ -26,22 +26,20 @@ VVP            = vvp
 VERILATOR      = verilator
 SURFER         = surfer
 
-# Generált fájlok külön 'build' almappába, hogy tiszta maradjon a projekt
-BUILD_DIR = build
+# Output build artifacts into a dedicated 'build' directory
+BUILD_DIR  = build
 SYNTH_JSON = $(BUILD_DIR)/$(PROJ)_synth.json
 PNR_JSON   = $(BUILD_DIR)/$(PROJ)_pnr.json
 BITSTREAM  = $(BUILD_DIR)/$(PROJ).fs
 SIM_OUT    = $(BUILD_DIR)/$(PROJ)_sim.out
 VCD_FILE   = dump.vcd
 
-
-
 # ==============================================================================
-# Kétfázisú Verilator konfiguráció
+# Two-Phase Verilator Configuration
 # ==============================================================================
 VERILATOR_DIR   = obj_dir
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT 2>/dev/null || echo /opt/homebrew/share/verilator)
-VCD_VERILATOR = verilator_dump.vcd
+VCD_VERILATOR   = verilator_dump.vcd
 
 CXX             = clang++
 CXXFLAGS        = -std=c++17 -Wall -O2 \
@@ -49,7 +47,7 @@ CXXFLAGS        = -std=c++17 -Wall -O2 \
                   -I$(VERILATOR_ROOT)/include \
                   -I$(VERILATOR_ROOT)/include/vltstd
 
-# A Verilator belső runtime forrásfájljai (ezek kellenek a VCD trace-hez és szimulációhoz)
+# Verilator internal runtime sources (required for VCD tracing and simulation)
 VLT_SRCS        = $(VERILATOR_ROOT)/include/verilated.cpp \
                   $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp \
                   $(VERILATOR_ROOT)/include/verilated_threads.cpp
@@ -57,25 +55,24 @@ VLT_SRCS        = $(VERILATOR_ROOT)/include/verilated.cpp \
 GEN_SRCS        = $(wildcard $(VERILATOR_DIR)/V$(TOP_MODULE)*.cpp)
 
 # ==============================================================================
-# CÉLOK (Targets)
+# Build Targets
 # ==============================================================================
-.PHONY: all build lint sim wave load flash clean help v-header build-v-sim run-v-sim v-wave v-clean sweep
+.PHONY: all build lint sim wave load flash clean help v-headers build-v-sim run-v-sim v-wave v-clean sweep stat
 
-# 1. FÁZIS: Csak a C++ headerek és osztályok generálása Verilogból
+# Phase 1: Generate C++ headers and model classes from Verilog
 v-headers:
 	$(VERILATOR) -Wno-DECLFILENAME -Wno-PROCASSINIT \
 	             --trace -cc $(SRCS) --top-module $(TOP_MODULE) \
 	             -GWAIT_TIME=24\'d5
 
-# 2. FÁZIS: A C++ tesztkörnyezet lefordítása natív clang++-szal
+# Phase 2: Compile C++ testbench with native clang++
 build-v-sim: $(VERILATOR_DIR)/V$(TOP_MODULE).h sim_main.cpp
 	$(CXX) $(CXXFLAGS) sim_main.cpp $(GEN_SRCS) $(VLT_SRCS) \
 	      -o $(VERILATOR_DIR)/sim_bin
 
-# Futtatás és hullámforma készítés
+# Run Verilator simulation and generate waveform
 run-v-sim: build-v-sim
 	./$(VERILATOR_DIR)/sim_bin
-
 
 v-wave: run-v-sim
 	$(SURFER) $(VCD_VERILATOR) &
@@ -89,22 +86,22 @@ VFLAGS = -Wall \
          -Wno-UNUSEDSIGNAL \
          -Wno-PINCONNECTEMPTY
 
-# 1. Gyors szintaktikai és logikai ellenőrzés (Verilator Linter)
+# 1. Fast syntax and logic check (Verilator Linter)
 lint:
 	$(VERILATOR) --lint-only $(VFLAGS) $(SRCS) --top-module $(TOP_MODULE)
 
-# 2. Szimuláció futtatása (Icarus Verilog)
+# 2. Run simulation (Icarus Verilog)
 sim: $(VCD_FILE)
 
 $(VCD_FILE): $(SRCS) $(TB_SRCS) | $(BUILD_DIR)
 	$(IVERILOG) -o $(SIM_OUT) -s $(TB_MODULE) $(SRCS) $(TB_SRCS)
 	$(VVP) $(SIM_OUT)
 
-# 3. Szimuláció + Hullámforma megnyitása Surferben
+# 3. Run simulation and open waveform in Surfer
 wave: sim
 	$(SURFER) $(VCD_FILE) &
 
-# 4. Teljes fizikai fordítás (Yosys -> nextpnr-himbaechel -> gowin_pack)
+# 4. Full physical FPGA build (Yosys -> nextpnr-himbaechel -> gowin_pack)
 build: $(BITSTREAM)
 
 $(BUILD_DIR):
@@ -118,28 +115,26 @@ $(PNR_JSON): $(SYNTH_JSON) $(CST)
 	           --write $(PNR_JSON) \
 	           --device $(DEVICE) \
 	           --vopt family=$(FAMILY) \
-			   --freq 61.44 \
+	           --freq 61.44 \
 	           --vopt cst=$(CST)
 
 $(BITSTREAM): $(PNR_JSON)
 	$(GOWIN_PACK) -d $(FAMILY) -o $(BITSTREAM) $(PNR_JSON)
 
-# 5. Feltöltés a kártya SRAM-jába (Gyors tesztelés, áramtalanításig marad meg)
+# 5. Load bitstream into board SRAM (volatile, fast testing)
 load: $(BITSTREAM)
 	$(OPENFPGALOADER) -b $(BOARD) $(BITSTREAM)
 
-# 6. Beégetés a kártya Flash memóriájába (Áramtalanítás után is megmarad)
+# 6. Flash bitstream into onboard SPI Flash (non-volatile)
 flash: $(BITSTREAM)
 	$(OPENFPGALOADER) -b $(BOARD) -f $(BITSTREAM)
 
-# 7. Takarítás
+# 7. Clean build artifacts
 clean:
 	rm -rf $(BUILD_DIR) $(VCD_FILE) $(VERILATOR_DIR)
 
 v-clean:
 	rm -rf $(VERILATOR_DIR)
-
-
 
 SWEEP_BIN = $(VERILATOR_DIR)/sim_sweep
 
@@ -152,7 +147,6 @@ $(SWEEP_BIN): $(SRCS) sim_sweep.cpp
 	$(CXX) $(CXXFLAGS) sim_sweep.cpp $(VERILATOR_DIR)/Vddc_top*.cpp $(VLT_SRCS) \
 	      -o $(SWEEP_BIN)
 
-
-# Csak a Yosys szintézis és a részletes erőforrás-táblázat kiírása
+# Run Yosys synthesis only and print detailed resource utilization statistics
 stat: $(SRCS) | $(BUILD_DIR)
 	$(YOSYS) -p "read_verilog $(SRCS); synth_gowin -top $(TOP_MODULE) -json $(SYNTH_JSON); stat"

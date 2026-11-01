@@ -1,18 +1,18 @@
-// Rendszerórajel és Reset gomb (S1)
+// System Clock and Reset Button (S1)
 IO_LOC "clk" 52;
 IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=UP;
 
 IO_LOC "rst_n" 3;
 IO_PORT "rst_n" IO_TYPE=LVCMOS18;
 
-// Fedélzeti USB-UART (Kenwood CAT)
+// Onboard USB-UART (Kenwood CAT)
 IO_LOC "uart_tx_pin" 17;
 IO_PORT "uart_tx_pin" IO_TYPE=LVCMOS33;
 
 IO_LOC "uart_rx_pin" 18;
 IO_PORT "uart_rx_pin" IO_TYPE=LVCMOS33 PULL_MODE=UP;
 
-// I2S Audio Kimenet
+// I2S Audio Output
 IO_LOC "i2s_sck_pin" 25;
 IO_PORT "i2s_sck_pin" IO_TYPE=LVCMOS33;
 
@@ -22,7 +22,7 @@ IO_PORT "i2s_ws_pin" IO_TYPE=LVCMOS33;
 IO_LOC "i2s_sd_pin" 27;
 IO_PORT "i2s_sd_pin" IO_TYPE=LVCMOS33;
 
-// AD9226 12-bites párhuzamos busz
+// AD9226 12-bit Parallel Data Bus
 IO_LOC "adc_data[0]" 28;
 IO_PORT "adc_data[0]" IO_TYPE=LVCMOS33;
 IO_LOC "adc_data[1]" 29;
@@ -48,7 +48,7 @@ IO_PORT "adc_data[10]" IO_TYPE=LVCMOS33;
 IO_LOC "adc_data[11]" 39;
 IO_PORT "adc_data[11]" IO_TYPE=LVCMOS33;
 
-// Fedélzeti 6 db LED
+// Onboard 6 LEDs
 IO_LOC "led[0]" 10;
 IO_LOC "led[1]" 11;
 IO_LOC "led[2]" 13;

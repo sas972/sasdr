@@ -1,23 +1,23 @@
 module cfir #(
-    parameter DATA_WIDTH = 24, // CIC kimeneti felbontás
-    parameter COEFF_WIDTH = 16, // Szűrőegyütthatók felbontása
-    parameter OUT_WIDTH  = 24  // CFIR kimeneti felbontás
+    parameter DATA_WIDTH  = 24, // CIC output resolution
+    parameter COEFF_WIDTH = 16, // Filter coefficient resolution
+    parameter OUT_WIDTH   = 24  // CFIR output resolution
 )(
-    input  wire                           clk,        // Gyors órajel (61.44 MHz)
-    input  wire                           rst_n,      // Aszinkron reset
-    input  wire                           in_valid,   // Impulzus a CIC-ből (192 kHz)
-    input  wire signed [DATA_WIDTH-1:0]   in_data,    // Nyers CIC minta (I vagy Q)
+    input  wire                           clk,        // High-speed clock (61.44 MHz)
+    input  wire                           rst_n,      // Asynchronous active-low reset
+    input  wire                           in_valid,   // Pulse from CIC (96 kHz)
+    input  wire signed [DATA_WIDTH-1:0]   in_data,    // Raw CIC sample (I or Q)
 
-    output reg  signed [OUT_WIDTH-1:0]    out_data,   // Kompenzált, sima alapsávi minta
-    output reg                            out_valid   // Kimeneti kész jel (1 órajel széles)
+    output reg  signed [OUT_WIDTH-1:0]    out_data,   // Droop-compensated baseband sample
+    output reg                            out_valid   // Output valid pulse (1 clock cycle wide)
 );
 
     localparam TAPS = 21;
 
-    // Shift regiszter az előző 21 minta tárolására
+    // Shift register storing the last 21 samples
     reg signed [DATA_WIDTH-1:0] shift_reg [0:TAPS-1];
 
-    // 21 tagú inverz sinc^4 kompenzáló együttható-tábla (szimmetrikus)
+    // 21-tap symmetric inverse sinc^4 compensating coefficient table
     reg signed [COEFF_WIDTH-1:0] coeff_rom [0:TAPS-1];
     initial begin
         coeff_rom[0]  = -16'sd35;   coeff_rom[1]  =  16'sd28;
@@ -25,7 +25,7 @@ module cfir #(
         coeff_rom[4]  = -16'sd320;  coeff_rom[5]  =  16'sd620;
         coeff_rom[6]  =  16'sd850;  coeff_rom[7]  = -16'sd1920;
         coeff_rom[8]  = -16'sd2850; coeff_rom[9]  =  16'sd9800;
-        coeff_rom[10] =  16'sd22100; // Középső csúcs (h[10])
+        coeff_rom[10] =  16'sd22100; // Center peak tap (h[10])
         coeff_rom[11] =  16'sd9800;  coeff_rom[12] = -16'sd2850;
         coeff_rom[13] = -16'sd1920; coeff_rom[14] =  16'sd850;
         coeff_rom[15] =  16'sd620;  coeff_rom[16] = -16'sd320;
@@ -33,18 +33,18 @@ module cfir #(
         coeff_rom[19] =  16'sd28;   coeff_rom[20] = -16'sd35;
     end
 
-    // MAC állapotgép számlálója
+    // MAC state machine counter
     reg [5:0] tap_idx = 0;
     reg       running = 0;
 
-    // Szorzó és Akkumulátor pipeline regiszterek
+    // Multiplier and accumulator pipeline registers
     reg signed [DATA_WIDTH-1:0]             fetch_data;
     reg signed [COEFF_WIDTH-1:0]            fetch_coeff;
     reg signed [DATA_WIDTH-1:0]             mac_data;
     reg signed [COEFF_WIDTH-1:0]            mac_coeff;
     reg signed [DATA_WIDTH+COEFF_WIDTH-1:0] mult_res;
     reg signed [DATA_WIDTH+COEFF_WIDTH-1:0] mult_pipe;
-    reg signed [DATA_WIDTH+COEFF_WIDTH+5:0] acc; // +6 bit tartalék a 21 tag összegzéséhez
+    reg signed [DATA_WIDTH+COEFF_WIDTH+5:0] acc; // +6 bits of headroom for summing 21 taps
 
     integer i;
 
@@ -65,7 +65,7 @@ module cfir #(
         end else begin
             out_valid <= 1'b0;
 
-            // Új minta érkezésekor shiftelés és pipeline nullázása
+            // On new sample arrival: shift delay line and clear MAC pipeline
             if (in_valid) begin
                 for (i = TAPS-1; i > 0; i = i - 1) begin
                     shift_reg[i] <= shift_reg[i-1];
@@ -82,7 +82,7 @@ module cfir #(
                 mult_pipe   <= 0;
                 acc         <= 0;
             end else if (running) begin
-                // Pipeline 1. lépcső: 21:1 MUX kiolvasása dedikált szövet (fabric) regiszterbe
+                // Pipeline Stage 1: Read 21:1 MUX into dedicated fabric registers
                 if (tap_idx < TAPS) begin
                     fetch_data  <= shift_reg[tap_idx];
                     fetch_coeff <= coeff_rom[tap_idx];
@@ -91,27 +91,26 @@ module cfir #(
                     fetch_coeff <= 0;
                 end
 
-                // Pipeline 2. lépcső: Gowin MULT18X18 DSP bemeneti regiszterek
+                // Pipeline Stage 2: Gowin MULT18X18 DSP input registers
                 mac_data  <= fetch_data;
                 mac_coeff <= fetch_coeff;
 
-                // Pipeline 3. lépcső: szorzás (Gowin DSP kimeneti regiszter)
+                // Pipeline Stage 3: Multiplication (Gowin DSP output register)
                 mult_res  <= mac_data * mac_coeff;
 
-                // Pipeline 4. lépcső: részeredmény-összeg regisztrálása (elválasztva az akkumulátortól)
+                // Pipeline Stage 4: Register partial-product sum (decoupled from accumulator)
                 mult_pipe <= mult_res;
 
-                // Pipeline 5. lépcső: 46 bites összegzés (akkumulálás)
+                // Pipeline Stage 5: 46-bit accumulation
                 acc       <= acc + mult_pipe;
 
                 tap_idx   <= tap_idx + 1;
 
-                // Szűrés befejezése (21 tap + 4 pipeline lépcső lefutása után)
+                // Complete filtering after 21 taps + 4 pipeline stages have flushed
                 if (tap_idx == TAPS + 4) begin
                     running   <= 1'b0;
                     out_valid <= 1'b1;
-                    // Skálázás: a szorzás és a koefficiensek normalizálása miatt 
-                    // az acc felső bitjeit vágjuk ki a kimenetre
+                    // Scaling: slice normalized upper bits from accumulator to output
                     out_data  <= acc[DATA_WIDTH+COEFF_WIDTH-2 : COEFF_WIDTH-1];
                 end
             end

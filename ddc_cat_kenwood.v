@@ -2,16 +2,16 @@ module ddc_cat_kenwood (
     input  wire        clk,
     input  wire        rst_n,
 
-    // UART RX felől jövő jelek
+    // Signals from UART RX
     input  wire        byte_ready,
     input  wire [7:0]  rx_byte,
 
-    // UART TX felé menő vezérlés
+    // Control signals to UART TX
     output reg  [7:0]  tx_byte,
     output reg         tx_start,
     input  wire        tx_busy,
 
-    // Frekvencia kimenet a DDC NCO-hoz
+    // Frequency tuning word output to DDC NCO
     output reg  [31:0] freq_tune,
     output reg         tune_valid
 );
@@ -29,9 +29,9 @@ module ddc_cat_kenwood (
     reg [31:0] acc_freq;
     reg        trigger_tx;
 
-    // A 11 számjegy közvetlen ASCII tárolója (nem kell visszafele 10-zel osztani!)
-    reg [7:0] rx_digits   [0:10]; // Ideiglenes bejövő számjegyek
-    reg [7:0] curr_digits [0:10]; // Aktuális érvényes frekvencia ASCII számjegyei
+    // Direct ASCII storage for the 11 frequency digits (avoids hardware division by 10 on readback)
+    reg [7:0] rx_digits   [0:10]; // Temporary incoming ASCII digits
+    reg [7:0] curr_digits [0:10]; // Currently active frequency ASCII digits
 
     wire [63:0] mult_res = {32'd0, acc_freq} * SCALE_FACTOR;
 
@@ -42,11 +42,11 @@ module ddc_cat_kenwood (
             rx_state    <= RX_IDLE;
             digit_count <= 4'd0;
             acc_freq    <= 32'd0;
-            freq_tune   <= 32'd494515985; // 7.074 MHz alapérték
+            freq_tune   <= 32'd494515985; // 7.074 MHz default tuning word
             tune_valid  <= 1'b0;
             trigger_tx  <= 1'b0;
 
-            // Alapértelmezett ASCII: "00007074000"
+            // Default ASCII frequency: "00007074000" (7.074 MHz)
             curr_digits[0] <= "0"; curr_digits[1] <= "0"; curr_digits[2] <= "0";
             curr_digits[3] <= "0"; curr_digits[4] <= "7"; curr_digits[5] <= "0";
             curr_digits[6] <= "7"; curr_digits[7] <= "4"; curr_digits[8] <= "0";
@@ -78,7 +78,7 @@ module ddc_cat_kenwood (
                 RX_FA: begin
                     if (byte_ready) begin
                         if (rx_byte == ";") begin
-                            trigger_tx <= 1'b1; // Lekérdezés ("FA;")
+                            trigger_tx <= 1'b1; // Query command ("FA;")
                             rx_state   <= RX_IDLE;
                         end else if (rx_byte >= "0" && rx_byte <= "9") begin
                             acc_freq <= (acc_freq * 32'd10) + {24'd0, (rx_byte - 8'd48)};
@@ -112,7 +112,7 @@ module ddc_cat_kenwood (
         end
     end
 
-    // --- ADÁSI ÁLLAPOTGÉP ("FA" + 11 digit + ";") ---
+    // --- TRANSMIT STATE MACHINE ("FA" + 11 digits + ";") ---
     reg [3:0] tx_idx;
     reg       tx_running;
 
@@ -145,7 +145,7 @@ module ddc_cat_kenwood (
                     end else if (tx_idx == 4'd13) begin
                         tx_byte    <= ";";
                         tx_start   <= 1'b1;
-                        tx_running <= 1'b0; // Utolsó karakter elindítva
+                        tx_running <= 1'b0; // Final character queued
                     end
                 end
             end
