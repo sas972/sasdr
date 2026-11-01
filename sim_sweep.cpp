@@ -27,8 +27,8 @@ int main(int argc, char** argv) {
 
     // Sweep configuration
     const double Fs = 61.44e6;             // 61.44 MHz ADC sample clock
-    const double F_start = 1.0e3;          // 1 kHz
-    const double F_stop  = 47.0e3;         // 47 kHz (below Nyquist of 96 kSPS)
+    const double F_start = 1.173e3;        // ~1 kHz (+173 Hz offset so sampling phase walks across peaks at 24/32 kHz)
+    const double F_stop  = 47.173e3;       // ~47 kHz (below Nyquist of 96 kSPS)
     const int    STEPS   = 100;            // 100 frequency measurement points
     const int    CYCLES_PER_FREQ = 60000;  // Clock cycles per frequency step (~93 samples @ 96 kSPS)
 
@@ -76,7 +76,9 @@ int main(int argc, char** argv) {
             if (top->iq_valid) {
                 // Measure peak only in the last two-thirds of the window after filter settling
                 if (c > (CYCLES_PER_FREQ / 3)) {
-                    int64_t abs_val = std::abs(static_cast<int32_t>(top->i_data));
+                    // Sign-extend 24-bit two's complement value from Verilator to 32-bit int32_t
+                    int32_t signed_i = (static_cast<int32_t>(top->i_data) << 8) >> 8;
+                    int64_t abs_val = std::abs(static_cast<int64_t>(signed_i));
                     if (abs_val > peak_val) {
                         peak_val = abs_val;
                     }

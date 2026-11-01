@@ -17,20 +17,20 @@ module cfir #(
     // Shift register storing the last 21 samples
     reg signed [DATA_WIDTH-1:0] shift_reg [0:TAPS-1];
 
-    // 21-tap symmetric inverse sinc^4 compensating coefficient table
+    // 21-tap symmetric inverse sinc^4 compensating coefficient table (DC sum = 16384 = 2^14)
     reg signed [COEFF_WIDTH-1:0] coeff_rom [0:TAPS-1];
     initial begin
-        coeff_rom[0]  = -16'sd35;   coeff_rom[1]  =  16'sd28;
-        coeff_rom[2]  =  16'sd120;  coeff_rom[3]  = -16'sd180;
-        coeff_rom[4]  = -16'sd320;  coeff_rom[5]  =  16'sd620;
-        coeff_rom[6]  =  16'sd850;  coeff_rom[7]  = -16'sd1920;
-        coeff_rom[8]  = -16'sd2850; coeff_rom[9]  =  16'sd9800;
-        coeff_rom[10] =  16'sd22100; // Center peak tap (h[10])
-        coeff_rom[11] =  16'sd9800;  coeff_rom[12] = -16'sd2850;
-        coeff_rom[13] = -16'sd1920; coeff_rom[14] =  16'sd850;
-        coeff_rom[15] =  16'sd620;  coeff_rom[16] = -16'sd320;
-        coeff_rom[17] = -16'sd180;  coeff_rom[18] =  16'sd120;
-        coeff_rom[19] =  16'sd28;   coeff_rom[20] = -16'sd35;
+        coeff_rom[0]  =  16'sd188;   coeff_rom[1]  = -16'sd244;
+        coeff_rom[2]  =  16'sd156;   coeff_rom[3]  =  16'sd207;
+        coeff_rom[4]  = -16'sd946;   coeff_rom[5]  =  16'sd2043;
+        coeff_rom[6]  = -16'sd3274;  coeff_rom[7]  =  16'sd4086;
+        coeff_rom[8]  = -16'sd3295;  coeff_rom[9]  = -16'sd2154;
+        coeff_rom[10] =  16'sd22850; // Center peak tap (h[10])
+        coeff_rom[11] = -16'sd2154;  coeff_rom[12] = -16'sd3295;
+        coeff_rom[13] =  16'sd4086;  coeff_rom[14] = -16'sd3274;
+        coeff_rom[15] =  16'sd2043;  coeff_rom[16] = -16'sd946;
+        coeff_rom[17] =  16'sd207;   coeff_rom[18] =  16'sd156;
+        coeff_rom[19] = -16'sd244;   coeff_rom[20] =  16'sd188;
     end
 
     // MAC state machine counter
@@ -110,8 +110,8 @@ module cfir #(
                 if (tap_idx == TAPS + 4) begin
                     running   <= 1'b0;
                     out_valid <= 1'b1;
-                    // Scaling: slice normalized upper bits from accumulator to output
-                    out_data  <= acc[DATA_WIDTH+COEFF_WIDTH-2 : COEFF_WIDTH-1];
+                    // Scaling: divide by 2^14 (16384) to normalize unity DC gain
+                    out_data  <= acc[DATA_WIDTH+COEFF_WIDTH-3 : COEFF_WIDTH-2];
                 end
             end
         end
