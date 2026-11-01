@@ -37,49 +37,77 @@ module cfir #(
     reg [5:0] tap_idx = 0;
     reg       running = 0;
 
-    // Szorzó és Akkumulátor regiszterek
-    reg signed [DATA_WIDTH-1:0]      mac_data;
-    reg signed [COEFF_WIDTH-1:0]     mac_coeff;
+    // Szorzó és Akkumulátor pipeline regiszterek
+    reg signed [DATA_WIDTH-1:0]             fetch_data;
+    reg signed [COEFF_WIDTH-1:0]            fetch_coeff;
+    reg signed [DATA_WIDTH-1:0]             mac_data;
+    reg signed [COEFF_WIDTH-1:0]            mac_coeff;
     reg signed [DATA_WIDTH+COEFF_WIDTH-1:0] mult_res;
+    reg signed [DATA_WIDTH+COEFF_WIDTH-1:0] mult_pipe;
     reg signed [DATA_WIDTH+COEFF_WIDTH+5:0] acc; // +6 bit tartalék a 21 tag összegzéséhez
 
     integer i;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            tap_idx   <= 0;
-            running   <= 0;
-            acc       <= 0;
-            mult_res  <= 0;
-            out_valid <= 0;
-            out_data  <= 0;
+            tap_idx     <= 0;
+            running     <= 0;
+            fetch_data  <= 0;
+            fetch_coeff <= 0;
+            mac_data    <= 0;
+            mac_coeff   <= 0;
+            mult_res    <= 0;
+            mult_pipe   <= 0;
+            acc         <= 0;
+            out_valid   <= 0;
+            out_data    <= 0;
             for (i = 0; i < TAPS; i = i + 1) shift_reg[i] <= 0;
         end else begin
             out_valid <= 1'b0;
 
-            // Új minta érkezésekor shiftelés és szorzás indítása
+            // Új minta érkezésekor shiftelés és pipeline nullázása
             if (in_valid) begin
                 for (i = TAPS-1; i > 0; i = i - 1) begin
                     shift_reg[i] <= shift_reg[i-1];
                 end
                 shift_reg[0] <= in_data;
 
-                tap_idx <= 0;
-                running <= 1'b1;
-                acc     <= 0;
+                tap_idx     <= 0;
+                running     <= 1'b1;
+                fetch_data  <= 0;
+                fetch_coeff <= 0;
+                mac_data    <= 0;
+                mac_coeff   <= 0;
+                mult_res    <= 0;
+                mult_pipe   <= 0;
+                acc         <= 0;
             end else if (running) begin
-                // Pipeline 1. lépcső: operandusok előkészítése
-                mac_data  <= shift_reg[tap_idx];
-                mac_coeff <= coeff_rom[tap_idx];
+                // Pipeline 1. lépcső: 21:1 MUX kiolvasása dedikált szövet (fabric) regiszterbe
+                if (tap_idx < TAPS) begin
+                    fetch_data  <= shift_reg[tap_idx];
+                    fetch_coeff <= coeff_rom[tap_idx];
+                end else begin
+                    fetch_data  <= 0;
+                    fetch_coeff <= 0;
+                end
 
-                // Pipeline 2. lépcső: szorzás (Gowin DSP) és összegzés
-                mult_res <= mac_data * mac_coeff;
-                acc      <= acc + mult_res;
+                // Pipeline 2. lépcső: Gowin MULT18X18 DSP bemeneti regiszterek
+                mac_data  <= fetch_data;
+                mac_coeff <= fetch_coeff;
 
-                tap_idx <= tap_idx + 1;
+                // Pipeline 3. lépcső: szorzás (Gowin DSP kimeneti regiszter)
+                mult_res  <= mac_data * mac_coeff;
 
-                // Szűrés befejezése (21 lépés után)
-                if (tap_idx == TAPS + 1) begin
+                // Pipeline 4. lépcső: részeredmény-összeg regisztrálása (elválasztva az akkumulátortól)
+                mult_pipe <= mult_res;
+
+                // Pipeline 5. lépcső: 46 bites összegzés (akkumulálás)
+                acc       <= acc + mult_pipe;
+
+                tap_idx   <= tap_idx + 1;
+
+                // Szűrés befejezése (21 tap + 4 pipeline lépcső lefutása után)
+                if (tap_idx == TAPS + 4) begin
                     running   <= 1'b0;
                     out_valid <= 1'b1;
                     // Skálázás: a szorzás és a koefficiensek normalizálása miatt 

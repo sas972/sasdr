@@ -18,7 +18,7 @@ BOARD     = tangnano9k
 # ==============================================================================
 YOSYS          = yosys
 NEXTPNR        = nextpnr-himbaechel
-GOWIN_PACK     = gowin_pack
+GOWIN_PACK    ?= $(shell which gowin_pack 2>/dev/null || echo ./venv/bin/gowin_pack)
 OPENFPGALOADER = openFPGALoader
 
 IVERILOG       = iverilog
