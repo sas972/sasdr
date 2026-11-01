@@ -1,6 +1,6 @@
 module cic_decimator #(
     parameter IN_WIDTH  = 16,
-    parameter DECIM_R   = 320,
+    parameter DECIM_R   = 640,
     parameter OUT_WIDTH = 24
 )(
     input  wire                      clk,      // Gyors ADC órajel (pl. 61.44 MHz)
@@ -10,8 +10,8 @@ module cic_decimator #(
     output reg                       out_valid // Impulzus, amikor új kimeneti adat áll rendelkezésre
 );
 
-    // Belső regiszterszélesség: 16 + ceil(4 * log2(320)) = 50 bit
-    localparam INT_WIDTH = 50;
+    // Belső regiszterszélesség: 16 + ceil(4 * log2(640)) = 54 bit
+    localparam INT_WIDTH = 54;
 
     // --- 1. INTEGRÁTOR FOKOZATOK (Gyors órajelen) ---
     reg signed [INT_WIDTH-1:0] itg0 = 0, itg1 = 0, itg2 = 0, itg3 = 0;
@@ -27,8 +27,8 @@ module cic_decimator #(
         end
     end
 
-    // --- 2. MINTAVÉTELI OSZTÓ (Rate Changer: 1/320) ---
-    reg [8:0] count = 0;
+    // --- 2. MINTAVÉTELI OSZTÓ (Rate Changer: 1/640) ---
+    reg [9:0] count = 0;
     reg sample_en = 0;
 
     always @(posedge clk or negedge rst_n) begin

@@ -149,7 +149,7 @@ sweep: $(SWEEP_BIN)
 $(SWEEP_BIN): $(SRCS) sim_sweep.cpp
 	$(VERILATOR) -Wno-DECLFILENAME -Wno-PROCASSINIT -Wno-WIDTH \
 	             -cc $(SRCS) --top-module ddc_top
-	$(CXX) $(CXXFLAGS) sim_sweep.cpp $(wildcard $(VERILATOR_DIR)/Vddc_top*.cpp) $(VLT_SRCS) \
+	$(CXX) $(CXXFLAGS) sim_sweep.cpp $(VERILATOR_DIR)/Vddc_top*.cpp $(VLT_SRCS) \
 	      -o $(SWEEP_BIN)
 
 

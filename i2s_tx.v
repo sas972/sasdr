@@ -1,9 +1,9 @@
 module i2s_tx #(
     parameter DATA_WIDTH  = 24,
     // CLK_DIV = (f_clk / (f_sample * 64 * 2))
+    // 61.44 MHz órajelnél 96 kHz mintavételhez: 61440000 / (96000 * 64 * 2) = 5
     // 61.44 MHz órajelnél 48 kHz mintavételhez: 61440000 / (48000 * 64 * 2) = 10
-    // 61.44 MHz órajelnél 192 kHz mintavételhez: CLK_DIV = 2.5 -> érdemes fix osztót használni
-    parameter CLK_DIV     = 10  
+    parameter CLK_DIV     = 5   
 )(
     input  wire                         clk,        // Rendszerórajel (61.44 MHz)
     input  wire                         rst_n,      // Aszinkron reset

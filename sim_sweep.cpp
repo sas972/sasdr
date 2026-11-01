@@ -28,13 +28,14 @@ int main(int argc, char** argv) {
     // Alapbeállítások
     const double Fs = 61.44e6;             // 61.44 MHz ADC órajel
     const double F_start = 1.0e3;          // 1 kHz
-    const double F_stop  = 95.0e3;         // 95 kHz (a 192 kSPS fele)
+    const double F_stop  = 47.0e3;         // 47 kHz (a 96 kSPS fele)
     const int    STEPS   = 100;            // 100 mérési frekvenciapont
-    const int    CYCLES_PER_FREQ = 25000;  // Órajelciklus frekvenciapontonként
+    const int    CYCLES_PER_FREQ = 60000;  // Órajelciklus frekvenciapontonként (~93 minta @ 96 kSPS)
 
     top->rst_n = 0;
     top->clk = 0;
-    top->freq_tune = 0; // 0 Hz-re hangolva: a CIC+CFIR közvetlen átvitele mérhető
+    top->uart_rx_pin = 1;                  // UART alapállapot (idle high)
+    top->ext_freq_tune = 1;                // Külső hangolás engedélyezése (~0 Hz: DC átvitel mérése)
     top->adc_sample = 0;
 
     // Reset ciklus
@@ -44,7 +45,7 @@ int main(int argc, char** argv) {
     }
     top->rst_n = 1;
 
-    std::cout << "[SIM] Frekvencia-sweep szimuláció indul (1 kHz -> 95 kHz)...\n";
+    std::cout << "[SIM] Frekvencia-sweep szimuláció indul (1 kHz -> 47 kHz)...\n";
 
     double max_nominal_peak = 0.0;
     std::vector<std::pair<double, double>> results;

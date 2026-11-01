@@ -2,7 +2,7 @@ module ddc_top #(
     parameter ADC_WIDTH   = 12, // AD9226 felbontása
     parameter NCO_WIDTH   = 12, // NCO fázis/amplitúdó pontosság
     parameter MIX_WIDTH   = 16, // Keverőből a CIC felé menő szélesség
-    parameter DECIM_R     = 320,// Decimálási arány (61.44 MHz -> 192 kHz)
+    parameter DECIM_R     = 640,// Decimálási arány (61.44 MHz -> 96 kHz)
     parameter OUT_WIDTH   = 24  // Kimeneti I/Q felbontás
 )(
     input  wire                          clk,           // Gyors ADC órajel (pl. 61.44 MHz)
@@ -24,7 +24,7 @@ module ddc_top #(
     input  wire [31:0]                   ext_freq_tune, // Ha != 0, felülbírálja az UART FTW-t
     output wire signed [OUT_WIDTH-1:0]   i_data,        // Alapsávi In-phase (I) adat
     output wire signed [OUT_WIDTH-1:0]   q_data,        // Alapsávi Quadrature (Q) adat
-    output wire                          iq_valid,      // Impulzus 192 kHz-en új minta esetén
+    output wire                          iq_valid,      // Impulzus 96 kHz-en új minta esetén
     output wire                          tune_led       // Opcionális visszajelző, ha jött CAT parancs
 );
 
@@ -159,7 +159,7 @@ module ddc_top #(
     // --- 5. I2S AUDIO TRANSZMITTER ---
     i2s_tx #(
         .DATA_WIDTH(24),
-        .CLK_DIV(10) // 61.44 MHz -> 48 kHz sztereó I2S
+        .CLK_DIV(5) // 61.44 MHz -> 96 kHz sztereó I2S
     ) u_i2s_tx (
         .clk(clk),
         .rst_n(rst_n),
